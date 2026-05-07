@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>VAULT</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;500;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0a0a0a;
+    --surface: #111111;
+    --border: #222222;
+    --border-bright: #333333;
+    --text: #e8e8e8;
+    --text-dim: #555555;
+    --text-muted: #333333;
+    --accent: #ffffff;
+    --danger: #ff3333;
+    --success: #aaaaaa;
+    --mono: 'JetBrains Mono', monospace;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Layout ── */
+  #app { display: flex; flex-direction: column; height: 100vh; }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 18px 28px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.35em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  .header-meta {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  #main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* ── Sidebar ── */
+  #sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .sidebar-search {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sidebar-search input {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 12px;
+    caret-color: var(--accent);
+  }
+
+  .sidebar-search input::placeholder { color: var(--text-muted); }
+
+  #entry-list {
+    flex: 1;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .entry-item {
+    padding: 11px 16px;
+    cursor: pointer;
+    border-bottom: 1px solid var(--border);
+    transition: background 0.1s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .entry-item:hover { background: var(--surface); }
+  .entry-item.active { background: var(--surface); border-left: 2px solid var(--accent); padding-left: 14px; }
+
+  .entry-icon {
+    width: 22px;
+    height: 22px;
+    border: 1px solid var(--border-bright);
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    color: var(--text-dim);
+    flex-shrink: 0;
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .entry-name {
+    font-size: 12px;
+    color: var(--text);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .entry-user {
+    font-size: 10px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .sidebar-footer {
+    padding: 12px 16px;
+    border-top: 1px solid var(--border);
+    display: flex;
+    gap: 8px;
+  }
+
+  /* ── Content ── */
+  #content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 32px 40px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: var(--text-muted);
+    gap: 8px;
+    text-align: center;
+  }
+
+  .empty-state .big { font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--text-dim); }
+
+  /* ── Entry Detail ── */
+  .detail-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .detail-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+
+  .detail-subtitle { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+  .detail-actions { display: flex; gap: 8px; }
+
+  .field-group { margin-bottom: 24px; }
+
+  .field-label {
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  .field-value {
+    font-size: 13px;
+    color: var(--text);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 10px 14px;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 40px;
+    word-break: break-all;
+  }
+
+  .field-value.password { font-size: 14px; letter-spacing: 0.08em; }
+
+  .backup-codes { display: flex; flex-direction: column; gap: 4px; }
+
+  .backup-code {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 8px 14px;
+    border-radius: 3px;
+    font-size: 13px;
+    letter-spacing: 0.1em;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .backup-code.used { opacity: 0.3; text-decoration: line-through; }
+
+  /* ── Forms ── */
+  .form-section { max-width: 520px; }
+  .form-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    margin-bottom: 28px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .form-group { margin-bottom: 18px; }
+
+  label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 6px;
+  }
+
+  input[type=text], input[type=password], textarea {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--mono);
+    font-size: 13px;
+    outline: none;
+    transition: border-color 0.15s;
+    caret-color: var(--accent);
+  }
+
+  input:focus, textarea:focus { border-color: var(--border-bright); }
+  textarea { resize: vertical; min-height: 80px; }
+
+  .input-row { display: flex; gap: 8px; align-items: flex-end; }
+  .input-row input { flex: 1; }
+
+  /* ── Buttons ── */
+  .btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    padding: 8px 14px;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+
+  .btn:hover { border-color: var(--border-bright); color: var(--text); }
+
+  .btn-primary {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: var(--bg);
+    font-weight: 700;
+  }
+
+  .btn-primary:hover { background: #dddddd; border-color: #dddddd; color: var(--bg); }
+
+  .btn-danger { border-color: transparent; color: var(--text-muted); }
+  .btn-danger:hover { border-color: var(--danger); color: var(--danger); }
+
+  .btn-icon {
+    background: transparent;
+    border: none;
+    color: var(--text-muted);
+    cursor: pointer;
+    padding: 4px 6px;
+    font-size: 12px;
+    font-family: var(--mono);
+    transition: color 0.15s;
+    flex-shrink: 0;
+  }
+
+  .btn-icon:hover { color: var(--text); }
+
+  .form-actions { display: flex; gap: 8px; margin-top: 28px; }
+
+  /* ── Lock Screen ── */
+  #lock-screen {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+  }
+
+  .lock-box {
+    width: 360px;
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .lock-logo {
+    font-family: 'Space Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.5em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    margin-bottom: 40px;
+  }
+
+  .lock-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--accent);
+    margin-bottom: 8px;
+    letter-spacing: 0.02em;
+  }
+
+  .lock-subtitle {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-bottom: 32px;
+    letter-spacing: 0.05em;
+  }
+
+  .lock-box input {
+    margin-bottom: 12px;
+    letter-spacing: 0.1em;
+  }
+
+  .lock-error {
+    font-size: 11px;
+    color: var(--danger);
+    margin-top: 8px;
+    min-height: 16px;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    background: var(--surface);
+    border: 1px solid var(--border-bright);
+    color: var(--text);
+    padding: 10px 18px;
+    font-size: 12px;
+    border-radius: 3px;
+    opacity: 0;
+    transform: translateY(8px);
+    transition: all 0.2s;
+    pointer-events: none;
+    letter-spacing: 0.05em;
+    z-index: 200;
+  }
+
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── Misc ── */
+  .divider { height: 1px; background: var(--border); margin: 24px 0; }
+
+  .tag {
+    display: inline-block;
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    border: 1px solid var(--border);
+    padding: 2px 7px;
+    border-radius: 2px;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 150;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+  }
+
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border-bright);
+    padding: 32px;
+    width: 440px;
+    border-radius: 4px;
+  }
+
+  .modal-title {
+    font-family: 'Space Mono', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .modal-actions { display: flex; gap: 8px; margin-top: 20px; justify-content: flex-end; }
+
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .hidden { display: none !important; }
+  .pw-hidden { filter: blur(4px); user-select: none; transition: filter 0.2s; }
+</style>
+</head>
+<body>
+
+<!-- Lock Screen -->
+<div id="lock-screen">
+  <div class="lock-box">
+    <div class="lock-logo">System</div>
+    <div class="lock-title">VAULT</div>
+    <div class="lock-subtitle">Enter master password to continue</div>
+    <input type="password" id="master-input" placeholder="master password" autocomplete="current-password">
+    <button class="btn btn-primary" id="unlock-btn" style="width:100%">UNLOCK</button>
+    <div class="lock-error" id="lock-error"></div>
+  </div>
+</div>
+
+<!-- Main App -->
+<div id="app" style="display:none">
+  <header>
+    <div class="logo">VAULT</div>
+    <div class="header-meta" id="header-meta">0 entries</div>
+  </header>
+  <div id="main">
+    <!-- Sidebar -->
+    <div id="sidebar">
+      <div class="sidebar-search">
+        <input type="text" id="search-input" placeholder="/ search entries...">
+      </div>
+      <div id="entry-list"></div>
+      <div class="sidebar-footer">
+        <button class="btn" style="flex:1" onclick="showAddForm()">+ ADD</button>
+        <button class="btn" onclick="showExportModal()" title="Export">↓</button>
+        <button class="btn" onclick="lockVault()" title="Lock">⊠</button>
+      </div>
+    </div>
+    <!-- Content -->
+    <div id="content">
+      <div class="empty-state" id="empty-state">
+        <div class="big">No entry selected</div>
+        <div style="color:var(--text-muted);font-size:11px;margin-top:4px">Select an entry or add a new one</div>
+      </div>
+      <div id="entry-detail" class="hidden"></div>
+      <div id="add-form" class="hidden form-section"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal-overlay" id="export-modal">
+  <div class="modal">
+    <div class="modal-title">EXPORT / BACKUP</div>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:16px;line-height:1.7">
+      Downloads an encrypted backup file. Store it safely — offline or on a USB drive.
+      You'll need your master password to restore it.
+    </p>
+    <div class="form-group">
+      <label>Confirm master password</label>
+      <input type="password" id="export-pw-confirm" placeholder="master password">
+    </div>
+    <div class="lock-error" id="export-error"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeExportModal()">CANCEL</button>
+      <button class="btn btn-primary" onclick="doExport()">DOWNLOAD BACKUP</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── Crypto Helpers ──────────────────────────────────────────────────────────
+
+const enc = new TextEncoder();
+const dec = new TextDecoder();
+
+async function deriveKey(password, salt) {
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveKey']
+  );
+  return crypto.subtle.deriveKey(
+    { name: 'PBKDF2', salt, iterations: 310000, hash: 'SHA-256' },
+    keyMaterial,
+    { name: 'AES-GCM', length: 256 },
+    false,
+    ['encrypt', 'decrypt']
+  );
+}
+
+async function encryptData(data, password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const iv   = crypto.getRandomValues(new Uint8Array(12));
+  const key  = await deriveKey(password, salt);
+  const ct   = await crypto.subtle.encrypt(
+    { name: 'AES-GCM', iv },
+    key,
+    enc.encode(JSON.stringify(data))
+  );
+  // Pack: salt(16) + iv(12) + ciphertext
+  const packed = new Uint8Array(16 + 12 + ct.byteLength);
+  packed.set(salt, 0);
+  packed.set(iv, 16);
+  packed.set(new Uint8Array(ct), 28);
+  return btoa(String.fromCharCode(...packed));
+}
+
+async function decryptData(b64, password) {
+  const packed = Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+  const salt = packed.slice(0, 16);
+  const iv   = packed.slice(16, 28);
+  const ct   = packed.slice(28);
+  const key  = await deriveKey(password, salt);
+  const pt   = await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, key, ct);
+  return JSON.parse(dec.decode(pt));
+}
+
+// ── State ────────────────────────────────────────────────────────────────────
+
+let vault = { entries: {} };
+let masterPassword = '';
+let activeEntry = null;
+const STORAGE_KEY = 'vault_data';
+
+// ── Lock / Unlock ─────────────────────────────────────────────────────────────
+
+document.getElementById('master-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') unlockVault();
+});
+document.getElementById('unlock-btn').addEventListener('click', unlockVault);
+
+async function unlockVault() {
+  const pw = document.getElementById('master-input').value;
+  if (!pw) return;
+  const errEl = document.getElementById('lock-error');
+  const btn = document.getElementById('unlock-btn');
+  btn.textContent = '...';
+  btn.disabled = true;
+
+  const stored = localStorage.getItem(STORAGE_KEY);
+  if (!stored) {
+    // First run — create vault
+    masterPassword = pw;
+    vault = { entries: {} };
+    await saveVault();
+    showApp();
+    return;
+  }
+
+  try {
+    vault = await decryptData(stored, pw);
+    masterPassword = pw;
+    errEl.textContent = '';
+    showApp();
+  } catch {
+    errEl.textContent = 'Wrong password.';
+    btn.textContent = 'UNLOCK';
+    btn.disabled = false;
+  }
+}
+
+function showApp() {
+  document.getElementById('lock-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'flex';
+  document.getElementById('master-input').value = '';
+  renderSidebar();
+}
+
+function lockVault() {
+  masterPassword = '';
+  vault = { entries: {} };
+  activeEntry = null;
+  document.getElementById('lock-screen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('master-input').value = '';
+  document.getElementById('lock-error').textContent = '';
+  document.getElementById('unlock-btn').textContent = 'UNLOCK';
+  document.getElementById('unlock-btn').disabled = false;
+}
+
+// ── Storage ──────────────────────────────────────────────────────────────────
+
+async function saveVault() {
+  const encrypted = await encryptData(vault, masterPassword);
+  localStorage.setItem(STORAGE_KEY, encrypted);
+}
+
+// ── Sidebar ──────────────────────────────────────────────────────────────────
+
+function renderSidebar(filter = '') {
+  const list = document.getElementById('entry-list');
+  const entries = Object.entries(vault.entries)
+    .filter(([name]) => name.toLowerCase().includes(filter.toLowerCase()))
+    .sort(([a], [b]) => a.localeCompare(b));
+
+  document.getElementById('header-meta').textContent =
+    `${Object.keys(vault.entries).length} entries`;
+
+  if (!entries.length) {
+    list.innerHTML = `<div style="padding:20px 16px;color:var(--text-muted);font-size:11px">No entries</div>`;
+    return;
+  }
+
+  list.innerHTML = entries.map(([name, entry]) => `
+    <div class="entry-item ${activeEntry === name ? 'active' : ''}" onclick="selectEntry('${name.replace(/'/g,"\\'")}')">
+      <div class="entry-icon">${name[0]}</div>
+      <div style="overflow:hidden">
+        <div class="entry-name">${name}</div>
+        <div class="entry-user">${entry.username || ''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('search-input').addEventListener('input', e => {
+  renderSidebar(e.target.value);
+});
+
+// ── Entry Detail ──────────────────────────────────────────────────────────────
+
+function selectEntry(name) {
+  activeEntry = name;
+  renderSidebar(document.getElementById('search-input').value);
+  showDetail(name);
+}
+
+function showDetail(name) {
+  const entry = vault.entries[name];
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('add-form').classList.add('hidden');
+  const detail = document.getElementById('entry-detail');
+  detail.classList.remove('hidden');
+
+  const backupHTML = entry.backup_codes && entry.backup_codes.length
+    ? `<div class="field-group">
+        <div class="field-label">Backup Codes</div>
+        <div class="backup-codes">
+          ${entry.backup_codes.map((c, i) => `
+            <div class="backup-code ${c.used ? 'used' : ''}" id="bcode-${i}">
+              <span>${c.code || c}</span>
+              <button class="btn-icon" onclick="markCodeUsed('${name.replace(/'/g,"\\'")}', ${i})" title="Mark used">✓</button>
+            </div>
+          `).join('')}
+        </div>
+      </div>`
+    : '';
+
+  const notesHTML = entry.notes
+    ? `<div class="field-group">
+        <div class="field-label">Notes</div>
+        <div class="field-value" style="white-space:pre-wrap;display:block">${entry.notes}</div>
+      </div>`
+    : '';
+
+  detail.innerHTML = `
+    <div class="detail-header">
+      <div>
+        <div class="detail-title">${name}</div>
+        <div class="detail-subtitle">Added ${(entry.added || '').slice(0,10)}</div>
+      </div>
+      <div class="detail-actions">
+        <button class="btn" onclick="showEditForm('${name.replace(/'/g,"\\'")}')">EDIT</button>
+        <button class="btn btn-danger" onclick="deleteEntry('${name.replace(/'/g,"\\'")}')">DELETE</button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <div class="field-label">Username / Email</div>
+      <div class="field-value">
+        <span>${entry.username || '—'}</span>
+        <button class="btn-icon" onclick="copy('${(entry.username||'').replace(/'/g,"\\'")}')">⧉</button>
+      </div>
+    </div>
+
+    <div class="field-group">
+      <div class="field-label">Password</div>
+      <div class="field-value password">
+        <span class="pw-text pw-hidden">${entry.password}</span>
+        <div style="display:flex;gap:4px">
+          <button class="btn-icon" onclick="togglePw(this)">◉</button>
+          <button class="btn-icon" onclick="copy('${entry.password.replace(/'/g,"\\'")}')">⧉</button>
+        </div>
+      </div>
+    </div>
+
+    ${backupHTML}
+    ${notesHTML}
+  `;
+}
+
+function togglePw(btn) {
+  const span = btn.closest('.field-value').querySelector('.pw-text');
+  span.classList.toggle('pw-hidden');
+}
+
+async function markCodeUsed(name, index) {
+  const entry = vault.entries[name];
+  if (Array.isArray(entry.backup_codes)) {
+    const code = entry.backup_codes[index];
+    if (typeof code === 'string') {
+      entry.backup_codes[index] = { code, used: true };
+    } else {
+      code.used = !code.used;
+    }
+    await saveVault();
+    showDetail(name);
+  }
+}
+
+async function deleteEntry(name) {
+  if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  delete vault.entries[name];
+  activeEntry = null;
+  await saveVault();
+  renderSidebar();
+  document.getElementById('entry-detail').classList.add('hidden');
+  document.getElementById('empty-state').classList.remove('hidden');
+  toast('Entry deleted');
+}
+
+// ── Add / Edit Form ────────────────────────────────────────────────────────────
+
+function showAddForm(prefill = null) {
+  activeEntry = null;
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('entry-detail').classList.add('hidden');
+  renderSidebar(document.getElementById('search-input').value);
+
+  const isEdit = prefill !== null;
+  const entry = isEdit ? vault.entries[prefill] : {};
+  const form = document.getElementById('add-form');
+  form.classList.remove('hidden');
+
+  form.innerHTML = `
+    <div class="form-title">${isEdit ? 'EDIT ENTRY' : 'NEW ENTRY'}</div>
+    <div class="form-group">
+      <label>Name *</label>
+      <input type="text" id="f-name" placeholder="e.g. github" value="${isEdit ? prefill : ''}" ${isEdit ? 'readonly style="opacity:0.5"' : ''}>
+    </div>
+    <div class="form-group">
+      <label>Username / Email</label>
+      <input type="text" id="f-user" placeholder="user@example.com" value="${entry.username || ''}">
+    </div>
+    <div class="form-group">
+      <label>Password</label>
+      <div class="input-row">
+        <input type="text" id="f-pw" placeholder="password" value="${entry.password || ''}">
+        <button class="btn" onclick="genPw()" type="button">GEN</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Backup Codes <span style="color:var(--text-muted)">(one per line)</span></label>
+      <textarea id="f-codes" placeholder="XXXX-XXXX&#10;XXXX-XXXX">${
+        isEdit && entry.backup_codes
+          ? entry.backup_codes.map(c => typeof c === 'string' ? c : c.code).join('\n')
+          : ''
+      }</textarea>
+    </div>
+    <div class="form-group">
+      <label>Notes</label>
+      <textarea id="f-notes" placeholder="Optional notes">${entry.notes || ''}</textarea>
+    </div>
+    <div class="form-actions">
+      <button class="btn btn-primary" onclick="saveEntry(${isEdit ? `'${prefill.replace(/'/g,"\\'")}'` : 'null'})">SAVE</button>
+      <button class="btn" onclick="cancelForm()">CANCEL</button>
+    </div>
+  `;
+}
+
+function showEditForm(name) {
+  showAddForm(name);
+}
+
+function cancelForm() {
+  document.getElementById('add-form').classList.add('hidden');
+  if (activeEntry) {
+    showDetail(activeEntry);
+  } else {
+    document.getElementById('empty-state').classList.remove('hidden');
+  }
+}
+
+function genPw() {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()-_=+';
+  const arr = new Uint8Array(22);
+  crypto.getRandomValues(arr);
+  document.getElementById('f-pw').value = Array.from(arr, b => chars[b % chars.length]).join('');
+}
+
+async function saveEntry(editingName) {
+  const name = editingName || document.getElementById('f-name').value.trim();
+  const username = document.getElementById('f-user').value.trim();
+  const password = document.getElementById('f-pw').value;
+  const notesVal = document.getElementById('f-notes').value.trim();
+  const codesRaw = document.getElementById('f-codes').value.trim();
+
+  if (!name) { alert('Name is required.'); return; }
+  if (!password) { alert('Password is required.'); return; }
+
+  const backup_codes = codesRaw
+    ? codesRaw.split('\n').map(l => l.trim()).filter(Boolean)
+    : [];
+
+  vault.entries[name] = {
+    username,
+    password,
+    backup_codes,
+    notes: notesVal,
+    added: (vault.entries[name]?.added) || new Date().toISOString(),
+  };
+
+  await saveVault();
+  activeEntry = name;
+  renderSidebar(document.getElementById('search-input').value);
+  showDetail(name);
+  toast(editingName ? 'Entry updated' : 'Entry saved');
+}
+
+// ── Export ────────────────────────────────────────────────────────────────────
+
+function showExportModal() {
+  document.getElementById('export-modal').classList.add('open');
+  document.getElementById('export-pw-confirm').value = '';
+  document.getElementById('export-error').textContent = '';
+}
+
+function closeExportModal() {
+  document.getElementById('export-modal').classList.remove('open');
+}
+
+async function doExport() {
+  const pw = document.getElementById('export-pw-confirm').value;
+  if (pw !== masterPassword) {
+    document.getElementById('export-error').textContent = 'Wrong password.';
+    return;
+  }
+  const encrypted = await encryptData(vault, masterPassword);
+  const blob = new Blob([encrypted], { type: 'text/plain' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `vault_backup_${new Date().toISOString().slice(0,10)}.enc`;
+  a.click();
+  URL.revokeObjectURL(url);
+  closeExportModal();
+  toast('Backup downloaded');
+}
+
+// ── Utils ─────────────────────────────────────────────────────────────────────
+
+function copy(text) {
+  navigator.clipboard.writeText(text).then(() => toast('Copied'));
+}
+
+let toastTimer;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// Close modal on overlay click
+document.getElementById('export-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeExportModal();
+});
+</script>
+</body>
+</html>
