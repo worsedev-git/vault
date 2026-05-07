@@ -492,6 +492,7 @@
       <div class="sidebar-footer">
         <button class="btn" style="flex:1" onclick="showAddForm()">+ ADD</button>
         <button class="btn" onclick="showExportModal()" title="Export">↓</button>
+        <button class="btn" onclick="showImportModal()" title="Import">↑</button>
         <button class="btn" onclick="lockVault()" title="Lock">⊠</button>
       </div>
     </div>
@@ -523,6 +524,29 @@
     <div class="modal-actions">
       <button class="btn" onclick="closeExportModal()">CANCEL</button>
       <button class="btn btn-primary" onclick="doExport()">DOWNLOAD BACKUP</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Modal -->
+<div class="modal-overlay" id="import-modal">
+  <div class="modal">
+    <div class="modal-title">IMPORT BACKUP</div>
+    <p style="font-size:12px;color:var(--text-dim);margin-bottom:16px;line-height:1.7">
+      Select your <code style="color:var(--text)">.enc</code> backup file and enter the password that was used to create it.
+    </p>
+    <div class="form-group">
+      <label>Backup file (.enc)</label>
+      <input type="file" id="import-file" accept=".enc,.txt" style="color:var(--text-dim);cursor:pointer;border:1px solid var(--border);padding:8px 12px;border-radius:3px;width:100%">
+    </div>
+    <div class="form-group">
+      <label>Password used for that backup</label>
+      <input type="password" id="import-pw" placeholder="original master password">
+    </div>
+    <div class="lock-error" id="import-error"></div>
+    <div class="modal-actions">
+      <button class="btn" onclick="closeImportModal()">CANCEL</button>
+      <button class="btn btn-primary" onclick="doImport()">IMPORT</button>
     </div>
   </div>
 </div>
@@ -907,6 +931,42 @@ async function doExport() {
   toast('Backup downloaded');
 }
 
+// ── Import ────────────────────────────────────────────────────────────────────
+
+function showImportModal() {
+  document.getElementById('import-modal').classList.add('open');
+  document.getElementById('import-pw').value = '';
+  document.getElementById('import-error').textContent = '';
+  document.getElementById('import-file').value = '';
+}
+
+function closeImportModal() {
+  document.getElementById('import-modal').classList.remove('open');
+}
+
+async function doImport() {
+  const file = document.getElementById('import-file').files[0];
+  const pw   = document.getElementById('import-pw').value;
+  const errEl = document.getElementById('import-error');
+
+  if (!file) { errEl.textContent = 'Please select a file.'; return; }
+  if (!pw)   { errEl.textContent = 'Please enter the password.'; return; }
+
+  const text = await file.text();
+  try {
+    const imported = await decryptData(text.trim(), pw);
+    const newEntries = imported.entries || {};
+    const count = Object.keys(newEntries).length;
+    Object.assign(vault.entries, newEntries);
+    await saveVault();
+    renderSidebar();
+    closeImportModal();
+    toast(`Imported ${count} entries`);
+  } catch {
+    errEl.textContent = 'Wrong password or invalid file.';
+  }
+}
+
 // ── Utils ─────────────────────────────────────────────────────────────────────
 
 function copy(text) {
@@ -922,9 +982,128 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 2000);
 }
 
-// Close modal on overlay click
+// Close modals on overlay click
 document.getElementById('export-modal').addEventListener('click', e => {
   if (e.target === e.currentTarget) closeExportModal();
+});
+document.getElementById('import-modal').addEventListener('click', e => {
+  if (e.target === e.currentTarget) closeImportModal();
+});
+
+// ── ASCII Effects ─────────────────────────────────────────────────────────────
+
+const ASCII_CHARS = '█▓▒░│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌';
+const GLITCH_CHARS = '!<>-_\\/[]{}—=+*^?#________';
+
+// Scanline overlay on lock screen
+const scanline = document.createElement('div');
+scanline.style.cssText = `
+  position:fixed;inset:0;pointer-events:none;z-index:99;
+  background:repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+`;
+document.body.appendChild(scanline);
+
+// Matrix rain canvas behind lock screen
+const canvas = document.createElement('canvas');
+canvas.style.cssText = 'position:fixed;inset:0;z-index:98;opacity:0.035;pointer-events:none;';
+document.getElementById('lock-screen').prepend(canvas);
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+const cols = Math.floor(window.innerWidth / 14);
+const drops = Array(cols).fill(1);
+
+function drawMatrix() {
+  ctx.fillStyle = 'rgba(10,10,10,0.05)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#ffffff';
+  ctx.font = '13px JetBrains Mono, monospace';
+  drops.forEach((y, i) => {
+    const char = ASCII_CHARS[Math.floor(Math.random() * ASCII_CHARS.length)];
+    ctx.fillText(char, i * 14, y * 14);
+    if (y * 14 > canvas.height && Math.random() > 0.975) drops[i] = 0;
+    drops[i]++;
+  });
+}
+setInterval(drawMatrix, 60);
+
+// Glitch effect on the VAULT title
+const lockTitle = document.querySelector('.lock-title');
+const originalTitle = lockTitle.textContent;
+
+function glitchText(el, original) {
+  let iterations = 0;
+  const interval = setInterval(() => {
+    el.textContent = original.split('').map((char, i) => {
+      if (i < iterations) return original[i];
+      if (char === ' ') return ' ';
+      return GLITCH_CHARS[Math.floor(Math.random() * GLITCH_CHARS.length)];
+    }).join('');
+    if (iterations >= original.length) clearInterval(interval);
+    iterations += 0.5;
+  }, 40);
+}
+
+// Run glitch on load
+setTimeout(() => glitchText(lockTitle, originalTitle), 300);
+
+// Re-glitch every 8 seconds
+setInterval(() => glitchText(lockTitle, originalTitle), 8000);
+
+// Glitch on logo in main app too
+function glitchLogo() {
+  const logo = document.querySelector('.logo');
+  if (!logo) return;
+  const orig = 'VAULT';
+  glitchText(logo, orig);
+}
+setInterval(glitchLogo, 12000);
+
+// Typing effect on lock subtitle
+const subtitle = document.querySelector('.lock-subtitle');
+const subtitleText = subtitle.textContent;
+subtitle.textContent = '';
+let si = 0;
+setTimeout(() => {
+  const typeInterval = setInterval(() => {
+    subtitle.textContent += subtitleText[si];
+    si++;
+    if (si >= subtitleText.length) clearInterval(typeInterval);
+  }, 35);
+}, 600);
+
+// Random flicker on border elements
+function flicker() {
+  const els = document.querySelectorAll('.entry-item, .field-value, .backup-code');
+  if (!els.length) return;
+  const el = els[Math.floor(Math.random() * els.length)];
+  el.style.opacity = '0.4';
+  setTimeout(() => el.style.opacity = '', 60);
+  setTimeout(() => {
+    el.style.opacity = '0.6';
+    setTimeout(() => el.style.opacity = '', 40);
+  }, 100);
+}
+setInterval(flicker, 3000);
+
+// ASCII border animation on lock box input focus
+document.getElementById('master-input').addEventListener('focus', () => {
+  lockTitle.style.textShadow = '0 0 20px rgba(255,255,255,0.15)';
+});
+document.getElementById('master-input').addEventListener('blur', () => {
+  lockTitle.style.textShadow = '';
 });
 </script>
 </body>
